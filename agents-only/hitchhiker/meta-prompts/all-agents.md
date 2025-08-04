@@ -106,6 +106,7 @@ Narrative chapters in: `./opusdocs/hitchhiker/chapters/`
 
 ---
 
+
 ## 4. Workshop Master Agent
 
 You create hands-on exercises and challenges. Your role is to:
