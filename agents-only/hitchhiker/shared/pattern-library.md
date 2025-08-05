@@ -2,6 +2,20 @@
 
 *A comprehensive exploration of advanced patterns discovered in the zOS codebase*
 
+---
+
+## Table of Contents
+
+1. [Advanced State Management Patterns](#-advanced-state-management-patterns)
+2. [Advanced Saga Orchestration Patterns](#-advanced-saga-orchestration-patterns)
+3. [Real-time Synchronization Patterns](#-real-time-synchronization-patterns)
+4. [Performance Optimization Patterns](#-performance-optimization-patterns)
+5. [Error Handling and Resilience Patterns](#-error-handling-and-resilience-patterns)
+6. [Architectural Innovation Patterns](#-architectural-innovation-patterns)
+7. [The zOS Pattern Philosophy](#-the-zos-pattern-philosophy)
+
+---
+
 ## 🌟 Advanced State Management Patterns
 
 ### 1. The Unified Normalization Engine
@@ -98,7 +112,94 @@ const receiveNormalized = (state, action: PayloadAction<any>) => {
 
 ## 🚀 Advanced Saga Orchestration Patterns
 
-### 4. The Batched Event Processing Pattern
+### 4. Root Saga Error Isolation Pattern
+
+**Category**: State
+**Location**: `/src/store/saga.ts`
+**Description**: Each saga module runs in its own isolated error boundary using spawn
+**Key Insights**: Prevents cascading failures - one saga crashing doesn't bring down the entire application
+
+```typescript
+export function* rootSaga() {
+  yield all(
+    Object.keys(allSagas).map((sagaName) => {
+      return spawn(function* () {
+        try {
+          yield call(allSagas[sagaName]);
+        } catch (error) {
+          console.log(`Saga [${sagaName}] has failed due to error.`, error);
+        }
+      });
+    })
+  );
+}
+```
+
+### 5. Multi-Channel Event Bus Pattern
+
+**Category**: Real-time
+**Location**: `/src/store/authentication/channels.ts`, `/src/lib/saga.ts`
+**Description**: Custom channel system for cross-saga communication without coupling
+**Key Insights**: Uses multicast channels and a custom `takeEveryFromBus` utility for elegant event handling
+
+```typescript
+export function takeEveryFromBus(bus, patternOrChannel, saga, ...args) {
+  return fork(function* () {
+    while (true) {
+      const action = yield take(bus, patternOrChannel);
+      yield fork(saga, ...args.concat(action));
+    }
+  });
+}
+```
+
+### 6. Scheduled Background Task Pattern
+
+**Category**: Performance
+**Location**: `/src/store/authentication/saga.ts`
+**Description**: Elegant pattern for scheduling periodic background tasks using infinite loops with delays
+**Key Insights**: Error boundaries prevent task death, spawned from login for lifecycle management
+
+```typescript
+const CACHE_MAINTENANCE_INTERVAL = 2 * 60 * 60 * 1000; // 2 hours
+
+export function* scheduleCacheMaintenance() {
+  while (true) {
+    yield delay(CACHE_MAINTENANCE_INTERVAL);
+    try {
+      yield call(performCacheMaintenance);
+    } catch (e) {
+      console.error('Error during cache maintenance:', e);
+    }
+  }
+}
+```
+
+### 7. Progress Tracking with Channels Pattern
+
+**Category**: Performance
+**Location**: `/src/store/matrix/saga.ts`
+**Description**: Adapts callback-based APIs to saga channels for progress reporting
+**Key Insights**: Non-blocking progress updates with proper resource cleanup
+
+```typescript
+const progressChannel = channel();
+const restorePromise = call([chatClient, chatClient.restoreSecureBackup], recoveryKey, 
+  (progress) => progressChannel.put(progress)
+);
+
+const progressTask = yield spawn(function* () {
+  while (true) {
+    yield put(setRestoreProgress(yield take(progressChannel)));
+  }
+});
+
+yield restorePromise;
+progressChannel.close();
+yield cancel(progressTask);
+```
+
+### 8. The Batched Event Processing Pattern
 
 **Location**: `/src/store/messages/saga.ts`, `/src/store/channels-list/saga.ts`
 
@@ -198,7 +299,50 @@ export function createChatConnection(userId: string, chatAccessToken: string, ch
 - **Async Event Processing**: Handles backpressure elegantly
 - **Clean Separation**: Decouples Matrix client from Redux state
 
-### 7. The Spawn-Isolated Error Boundary Pattern
+### 7. Uploadable Class-Based Saga Pattern
+
+**Category**: State
+**Location**: `/src/store/messages/uploadable.ts`
+**Description**: Uses classes with generator methods for polymorphic file upload handling
+**Key Insights**: Clean abstraction for different media types with shared interface
+
+```typescript
+export interface Uploadable {
+  file: any;
+  optimisticMessage: Message;
+  upload: (channelId, rootMessageId, isPost?) => Generator<CallEffect<Message | unknown>>;
+}
+
+export class UploadableMedia implements Uploadable {
+  *upload(channelId, rootMessageId, isPost = false) {
+    return yield call(uploadFileMessage, channelId, this.file.nativeFile, rootMessageId, 
+      this.optimisticMessage?.id?.toString(), isPost);
+  }
+}
+```
+
+### 8. Event Channel Queuing Pattern
+
+**Category**: Real-time
+**Location**: `/src/store/chat/bus.ts`
+**Description**: Sophisticated event queuing during Matrix initialization
+**Key Insights**: Prevents event loss and maintains ordering during connection setup
+
+```typescript
+const queuedEvents = [];
+let queueing = true;
+
+const emit = async (event) => {
+  if (queueing) {
+    queuedEvents.push(queuedEmit(event));
+  } else {
+    await processQueuePromise;
+    rawEmit(event);
+  }
+};
+```
+
+### 9. The Spawn-Isolated Error Boundary Pattern
 
 **Location**: `/src/store/saga.ts`
 
@@ -292,6 +436,32 @@ function* batchedRoomDataAction(action: RoomDataAction) {
   
   const channelIds = batchedUpdates.map((update) => update.roomId);
   yield call(batchedUpdateLastMessage, channelIds);
+}
+```
+
+### 10. Race with Progress Animation Pattern
+
+**Category**: Performance
+**Location**: `/src/store/chat/saga.ts`
+**Description**: Shows loading progress while racing between completion and cancellation
+**Key Insights**: Fork for animation, race for control flow, explicit cleanup
+
+```typescript
+export function* waitForChatConnectionCompletion() {
+  const progressTracker = yield fork(function* () {
+    for (let progress = 5; progress < 100; progress += 1.5) {
+      yield delay(50);
+      yield put(setLoadingConversationProgress(progress));
+    }
+  });
+
+  const { complete } = yield race({
+    complete: take(yield call(getChatBus), ChatEvents.ChatConnectionComplete),
+    abort: take(yield call(getAuthChannel), AuthEvents.UserLogout),
+  });
+
+  yield cancel(progressTracker);
+  return complete ? true : false;
 }
 ```
 
@@ -501,5 +671,21 @@ function* activateWhenConversationsLoaded(activate) {
 - **Event Channel Queuing**: Events are buffered during initialization for perfect ordering
 - **Spawn Isolation**: Each saga runs in its own error boundary
 - **Batched Processing**: Multiple patterns for efficient batch operations
+- **Generator Methods in Classes**: The Uploadable pattern shows how to use generators in class methods
+- **Progress with Race**: Combining fork, race, and cancel for responsive UIs
+- **Multicast Channels**: Enable true pub/sub architecture within Redux-Saga
+- **takeEveryFromBus**: Custom utility that makes channel consumption elegant
+
+### Advanced Saga Patterns Summary:
+
+1. **Error Boundaries Everywhere**: Every saga module wrapped in spawn with try/catch
+2. **Channels as Event Buses**: Multicast channels enable decoupled communication
+3. **Race for Everything**: User actions can always be cancelled (logout, navigation)
+4. **Progress Tracking**: Long operations provide real-time feedback
+5. **Batching is Key**: High-frequency events always batched for performance
+6. **Optimistic First**: UI updates immediately, rollback on failure
+7. **Resource Cleanup**: Every spawn has a cancel, every channel has a close
 
 This pattern library represents some of the most sophisticated Redux-Saga-Normalizr implementations found in modern applications. Each pattern solves real-world problems with elegant, maintainable solutions that scale to enterprise complexity.
+
+The zOS codebase demonstrates that Redux-Saga, when mastered, provides unparalleled control over complex async flows, real-time synchronization, and error handling. These patterns show how to build resilient, performant applications that handle the chaos of distributed systems with grace.

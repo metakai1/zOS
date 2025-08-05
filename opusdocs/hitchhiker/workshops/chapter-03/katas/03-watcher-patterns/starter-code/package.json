@@ -1,0 +1,20 @@
+{
+  "name": "watcher-patterns-kata",
+  "version": "1.0.0",
+  "description": "Master Redux-Saga watcher patterns - handling concurrent actions like a pro",
+  "main": "watchers.js",
+  "scripts": {
+    "test": "jest --watchAll",
+    "test:once": "jest"
+  },
+  "keywords": ["redux-saga", "watchers", "concurrency", "kata"],
+  "author": "Hitchhiker's Guide to zOS",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "generator-basics-kata",
+  "version": "1.0.0",
+  "description": "Learn generator functions - the foundation of Redux-Saga",
+  "main": "generators.js",
+  "scripts": {
+    "test": "jest --watchAll",
+    "test:once": "jest"
+  },
+  "keywords": ["generators", "redux-saga", "kata"],
+  "author": "Hitchhiker's Guide to zOS",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  }
+}

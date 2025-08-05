@@ -1,0 +1,20 @@
+{
+  "name": "effect-creators-kata",
+  "version": "1.0.0",
+  "description": "Master Redux-Saga effects - the spells of async programming",
+  "main": "effects.js",
+  "scripts": {
+    "test": "jest --watchAll",
+    "test:once": "jest"
+  },
+  "keywords": ["redux-saga", "effects", "kata"],
+  "author": "Hitchhiker's Guide to zOS",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  }
+}
