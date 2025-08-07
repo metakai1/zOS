@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 
 import ZeroProSymbol from '../../../../../../zero-pro-symbol.svg?react';
 import { Button, Variant as ButtonVariant } from '@zero-tech/zui/components/Button';
@@ -23,14 +24,21 @@ export const CreatingChannelStage: React.FC<CreatingChannelStageProps> = ({
 }) => {
   const [success, setSuccess] = useState(false);
   const history = useHistory();
+  const queryClient = useQueryClient();
   const { createChannel, isCreating, error, reset } = useCreateChannel();
 
-  const handleCreateChannel = useCallback(async () => {
+  const handleClose = useCallback(() => {
+    setLastActiveFeed(selectedZid);
+    history.push(`/feed/${selectedZid}`);
+    onComplete();
+  }, [selectedZid, history, onComplete]);
+
+  const handleCreateCommunity = useCallback(async () => {
     if (!tokenData) {
       return;
     }
 
-    // Reset any previous error state when retrying
+    // Reset any previous error state
     reset();
 
     const result = await createChannel({
@@ -42,29 +50,20 @@ export const CreatingChannelStage: React.FC<CreatingChannelStageProps> = ({
     });
 
     if (result.success) {
+      // Invalidate queries to refresh channel lists immediately
+      queryClient.invalidateQueries({ queryKey: ['token-gated-channels', 'mine'] });
+      queryClient.invalidateQueries({ queryKey: ['token-gated-channels', 'all'] });
+
       setSuccess(true);
-      // Navigate to the new channel after a brief delay
-      setTimeout(() => {
-        setLastActiveFeed(selectedZid);
-        history.push(`/feed/${selectedZid}`);
-        onComplete();
-      }, 1500);
     }
   }, [
     selectedZid,
     tokenData,
     joiningFee,
-    history,
-    onComplete,
     createChannel,
     reset,
+    queryClient,
   ]);
-
-  useEffect(() => {
-    if (tokenData) {
-      handleCreateChannel();
-    }
-  }, [handleCreateChannel, tokenData]);
 
   if (isCreating) {
     return (
@@ -75,22 +74,26 @@ export const CreatingChannelStage: React.FC<CreatingChannelStageProps> = ({
     );
   }
 
-  if (!error) {
+  if (error) {
     return (
       <div className={styles.ErrorContainer}>
         <div className={styles.ZidTitle}>0://{selectedZid}</div>
 
-        <div className={styles.ErrorTitle}>Failed to Create Channel</div>
+        <div className={styles.ErrorTitle}>Failed to Apply Token-Gated Settings</div>
         <div className={styles.ErrorText}>
-          Channel creation failed. Your ZID has been purchased, but we encountered an issue creating the channel. Please
-          try again.
+          Token-gated settings failed to be applied. Your ZID has been purchased, but we encountered an issue setting up
+          the token-gated requirements. Please try again. If this issue persists, please contact support.
         </div>
         <div className={styles.SubmitButtonContainer}>
+          <Button className={styles.SubmitButton} variant={ButtonVariant.Primary} onPress={onComplete}>
+            Close
+          </Button>
+
           <Button
             className={styles.SubmitButton}
             variant={ButtonVariant.Primary}
             isSubmit
-            onPress={handleCreateChannel}
+            onPress={handleCreateCommunity}
             isDisabled={isCreating}
             isLoading={isCreating}
           >
@@ -109,7 +112,7 @@ export const CreatingChannelStage: React.FC<CreatingChannelStageProps> = ({
         </div>
         <div className={styles.SuccessTitle}>Successfully Created 0://{selectedZid} community</div>
         <div className={styles.SubmitButtonContainer}>
-          <Button className={styles.SubmitButton} variant={ButtonVariant.Primary} isSubmit onPress={onComplete}>
+          <Button className={styles.SubmitButton} variant={ButtonVariant.Primary} isSubmit onPress={handleClose}>
             View Channel
           </Button>
         </div>
@@ -117,5 +120,27 @@ export const CreatingChannelStage: React.FC<CreatingChannelStageProps> = ({
     );
   }
 
-  return null;
+  // Show success message with create community button
+  return (
+    <div className={styles.SuccessContainer}>
+      <div className={styles.LogoGlassWrapper}>
+        <ZeroProSymbol width={120} height={140} />
+      </div>
+      <div className={styles.SuccessTitle}>
+        Your ZID 0://{selectedZid} has been successfully minted. You can now create your community.
+      </div>
+      <div className={styles.SubmitButtonContainer}>
+        <Button
+          className={styles.SubmitButton}
+          variant={ButtonVariant.Primary}
+          isSubmit
+          onPress={handleCreateCommunity}
+          isDisabled={isCreating}
+          isLoading={isCreating}
+        >
+          Create Community
+        </Button>
+      </div>
+    </div>
+  );
 };

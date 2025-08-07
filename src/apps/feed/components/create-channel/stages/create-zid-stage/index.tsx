@@ -38,11 +38,11 @@ export const CreateZidStage: React.FC<CreateZidStageProps> = ({ onNext, mainnetP
   const hasError = !!(availabilityError || priceError);
 
   const buttonConfig = useMemo(() => {
-    if (available && !isLoading) {
+    if (available && !isLoading && Number(fee) > 0) {
       return { text: 'Continue', disabled: false };
     }
     return { text: 'Enter a valid ZERO ID to continue', disabled: true };
-  }, [available, isLoading]);
+  }, [available, isLoading, fee]);
 
   const endEnhancer = useMemo(() => {
     if (isLoading) return <div className={styles.Spinner} />;
@@ -67,11 +67,7 @@ export const CreateZidStage: React.FC<CreateZidStageProps> = ({ onNext, mainnetP
     if (hasError) return <span className={styles.Failure}>{String(availabilityError || priceError)}</span>;
     if (available) {
       const displayPrice = parsePrice(priceData?.total);
-      return (
-        <span className={styles.Success}>
-          Available for {displayPrice} {tokenTicker}
-        </span>
-      );
+      return <span className={styles.Success}>Available for {displayPrice} MEOW</span>;
     }
     if (available === false) {
       return <span className={styles.Failure}>Not available</span>;
@@ -84,7 +80,6 @@ export const CreateZidStage: React.FC<CreateZidStageProps> = ({ onNext, mainnetP
     priceError,
     available,
     priceData,
-    tokenTicker,
   ]);
 
   const handleContinue = useCallback(() => {
